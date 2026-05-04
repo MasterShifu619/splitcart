@@ -1,0 +1,27 @@
+# Secrets
+.env
+token.json
+credentials.json
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+infra/terraform.tfvars
+infra/splitcart.zip
+infra/build/
+
+# Local dev / debug scripts
+debug_*.py
+test_*.py
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.so
+
+# Installed packages (from pip install -t .)
+*.dist-info/
+*.egg-info/
+bin/
