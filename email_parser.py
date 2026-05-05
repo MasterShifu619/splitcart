@@ -1,6 +1,7 @@
 import re
 import base64
 import logging
+from html.parser import HTMLParser
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -12,17 +13,42 @@ _CARD_RE = re.compile(r"\w[\w ]+? ending in (\d{4})")
 _ORDER_ID_RE = re.compile(r"Instacart Order Id:\s*\*?\s*(\d+)")
 
 
-def _decode_body(payload: dict) -> str:
-    """Recursively extract plain-text body from Gmail message payload."""
+class _HTMLStripper(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self._parts = []
+
+    def handle_data(self, data):
+        stripped = data.strip()
+        if stripped:
+            self._parts.append(stripped)
+
+    def get_text(self):
+        return "\n".join(self._parts)
+
+
+def _extract_mime(payload: dict, mime_target: str) -> str:
     mime = payload.get("mimeType", "")
-    if mime == "text/plain":
+    if mime == mime_target:
         data = payload.get("body", {}).get("data", "")
         return base64.urlsafe_b64decode(data + "==").decode("utf-8", errors="replace")
+    result = ""
     for part in payload.get("parts", []):
-        result = _decode_body(part)
-        if result:
-            return result
-    return ""
+        result += _extract_mime(part, mime_target)
+    return result
+
+
+def _decode_body(payload: dict) -> str:
+    """Return plain text if it has key fields; otherwise strip and use HTML."""
+    plain = _extract_mime(payload, "text/plain")
+    if plain and _DATE_RE.search(plain) and _TOTAL_RE.search(plain):
+        return plain
+    html_raw = _extract_mime(payload, "text/html")
+    if html_raw:
+        stripper = _HTMLStripper()
+        stripper.feed(html_raw)
+        return stripper.get_text()
+    return plain
 
 
 def parse_instacart_email(message: dict) -> Optional[dict]:
