@@ -60,7 +60,7 @@ def lambda_handler(event, context):
         instacart_order_id = parsed.get("instacart_order_id")
 
         try:
-            expense_id = splitwise_client.create_grocery_expense(total, store, order_date, payer_id, instacart_order_id)
+            expense_id = splitwise_client.create_grocery_expense(total, store, order_date, payer_id, instacart_order_id, notes=parsed.get("notes"))
             dynamo_client.record_order(email_id, total, store, expense_id, instacart_order_id)
             logger.info("Processed email %s: $%.2f at %s → expense %s", email_id, total, store, expense_id)
             processed += 1

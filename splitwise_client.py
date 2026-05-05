@@ -21,7 +21,7 @@ def _build_client() -> Splitwise:
     )
 
 
-def create_grocery_expense(total: float, store: str, order_date: str, payer_id: int, instacart_order_id: str = None) -> str:
+def create_grocery_expense(total: float, store: str, order_date: str, payer_id: int, instacart_order_id: str = None, notes: str = None) -> str:
     """Create equal-split expense. Returns Splitwise expense ID."""
     client = _build_client()
     n = len(SPLITWISE_USER_IDS)
@@ -33,6 +33,8 @@ def create_grocery_expense(total: float, store: str, order_date: str, payer_id: 
     expense.currency_code = "USD"
     order_suffix = f" #{instacart_order_id}" if instacart_order_id else ""
     expense.description = f"Groceries – {store} ({order_date}){order_suffix}"
+    if notes:
+        expense.details = notes
     expense.group_id = SPLITWISE_GROUP_ID
     expense.split_equally = False
 
