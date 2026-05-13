@@ -23,7 +23,7 @@ Automatically splits Instacart grocery bills among roommates using Splitwise. No
 3. Lambda wakes up every 10 minutes, fetches unread emails
 4. Parses store, total, card last-4, and **itemized receipt** (item names + prices + tax)
 5. RAG pipeline classifies each item as personal (one person) or shared:
-   - Deterministic pre-filter checks roommate profile keywords (wet wipes → Bipin, pasta → Mahim)
+   - Deterministic pre-filter checks roommate profile keywords (LaCroix → Mahim, pasta → Varun)
    - Ambiguous items go to Pinecone (retrieves profile + history context) → Bedrock Nova Lite classifies
 6. Computes unequal owed amounts: personal items full price to owner + shared items + tax/fee split equally
 7. Creates Splitwise expense with correct payer, per-person owed amounts, and annotated notes
@@ -159,7 +159,7 @@ Create `profiles/<splitwise_user_id>.json` for each roommate:
 {
   "name": "Alice",
   "splitwise_id": 12345678,
-  "personal_items": ["LaCroix", "sparkling water", "pasta"],
+  "personal_items": ["LaCroix", "sparkling water", "pasta", "greek yogurt"],
   "never_buys": ["soda", "ramen"]
 }
 ```
