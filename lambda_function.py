@@ -8,6 +8,7 @@ import dynamo_client
 import gmail_client
 import email_parser
 import splitwise_client
+import item_splitter
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -20,6 +21,65 @@ CARD_TO_USER = {
     for part in os.environ["CARD_TO_USER"].split(",")
     for card, uid in [part.strip().split(":")]
 }
+
+
+USER_NAMES = {
+    36896689: "Bipin",
+    61548829: "Mahim",
+    48292153: "Varun",
+    68880174: "Deepanshu",
+}
+
+
+def _build_smart_notes(items, assignments, tax, service_fee, owed_shares):
+    assign_map = {a["item"]: a["assign_to"] for a in assignments}
+    lines = []
+
+    for item in items:
+        name = item["name"]
+        price = item["price"]
+        assign_to = assign_map.get(name, "shared")
+        if assign_to == "shared":
+            tag = "Shared"
+        else:
+            tag = f"{USER_NAMES.get(assign_to, str(assign_to))} (personal)"
+        lines.append(f"{name}: ${price:.2f} → {tag}")
+
+    lines.append("")
+    lines.append(f"Sales Tax: ${tax:.2f}")
+    lines.append(f"Service Fee: ${service_fee:.2f}")
+    lines.append("")
+    lines.append("Split:")
+    for uid, amount in owed_shares.items():
+        lines.append(f"  {USER_NAMES.get(uid, str(uid))}: ${amount:.2f}")
+
+    return "\n".join(lines)
+
+
+def _compute_owed_shares(items, assignments, tax, service_fee, active_user_ids):
+    n = len(active_user_ids)
+    owed = {uid: 0.0 for uid in active_user_ids}
+    shared_subtotal = 0.0
+
+    assign_map = {a["item"]: a["assign_to"] for a in assignments}
+
+    for item in items:
+        price = item["price"]
+        assign_to = assign_map.get(item["name"], "shared")
+        if assign_to != "shared" and assign_to in owed:
+            owed[assign_to] += price
+        else:
+            shared_subtotal += price
+
+    shared_total = shared_subtotal + tax + service_fee
+    share = round(shared_total / n, 2)
+    remainder = round(shared_total - share * n, 2)
+
+    for i, uid in enumerate(active_user_ids):
+        owed[uid] += share + (remainder if i == 0 else 0.0)
+        owed[uid] = round(owed[uid], 2)
+
+    return owed
 
 
 def lambda_handler(event, context):
@@ -58,9 +118,30 @@ def lambda_handler(event, context):
         order_date = parsed["order_date"]
         total = parsed["total"]
         instacart_order_id = parsed.get("instacart_order_id")
+        active_user_ids = splitwise_client.SPLITWISE_USER_IDS
 
         try:
-            expense_id = splitwise_client.create_grocery_expense(total, store, order_date, payer_id, instacart_order_id, notes=parsed.get("notes"))
+            owed_shares = None
+            notes = parsed.get("notes")
+            structured = parsed.get("structured_items")
+            if structured and structured["items"]:
+                item_names = [it["name"] for it in structured["items"]]
+                assignments = item_splitter.classify_items(item_names, active_user_ids)
+                owed_shares = _compute_owed_shares(
+                    structured["items"], assignments,
+                    structured["tax"], structured["service_fee"],
+                    active_user_ids,
+                )
+                notes = _build_smart_notes(
+                    structured["items"], assignments,
+                    structured["tax"], structured["service_fee"],
+                    owed_shares,
+                )
+
+            expense_id = splitwise_client.create_grocery_expense(
+                total, store, order_date, payer_id, instacart_order_id,
+                notes=notes, owed_shares=owed_shares,
+            )
             dynamo_client.record_order(email_id, total, store, expense_id, instacart_order_id)
             logger.info("Processed email %s: $%.2f at %s → expense %s", email_id, total, store, expense_id)
             processed += 1

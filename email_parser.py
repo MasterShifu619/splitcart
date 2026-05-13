@@ -11,7 +11,7 @@ _DATE_RE = re.compile(r"placed on (.+?) and")
 _TOTAL_RE = re.compile(r"Total\s+\$([0-9]+\.[0-9]{2})")
 _CARD_RE = re.compile(r"\w[\w ]+? ending in (\d{4})")
 _ORDER_ID_RE = re.compile(r"Instacart Order Id:\s*\*?\s*(\d+)")
-_QTY_RE = re.compile(r"^\d+ x \$[\d.]+$")
+_QTY_RE = re.compile(r"^\d+(?:\.\d+)? lb x \$[\d.]+$|^\d+ x \$[\d.]+$")
 _PRICE_RE = re.compile(r"^\$[\d.]+$")
 _TOTALS_LABELS = ("Items Subtotal", "Sales Tax", "Service Fee", "Total")
 
@@ -52,6 +52,51 @@ def _decode_body(payload: dict) -> str:
         stripper.feed(html_raw)
         return stripper.get_text()
     return plain
+
+
+def _parse_structured_items(body: str) -> Optional[dict]:
+    """Returns {"items": [{"name", "price"}], "tax", "service_fee", "subtotal"} or None."""
+    lines = body.splitlines()
+    start = next((i for i, l in enumerate(lines) if l.strip().lower() == "items found"), None)
+    end = next((i for i, l in enumerate(lines) if l.strip() == "Order Totals"), None)
+    if start is None or end is None:
+        return None
+
+    item_lines = lines[start:end]
+    items = []
+    for i, line in enumerate(item_lines):
+        if _QTY_RE.match(line.strip()):
+            j = i - 1
+            while j >= 0 and item_lines[j].strip().startswith("("):
+                j -= 1
+            if j < 0:
+                continue
+            name = item_lines[j].strip()
+            for k in range(i + 1, min(i + 8, len(item_lines))):
+                if item_lines[k].strip() == "Final item price:" and k + 1 < len(item_lines):
+                    price_str = item_lines[k + 1].strip().lstrip("$")
+                    try:
+                        items.append({"name": name, "price": float(price_str)})
+                    except ValueError:
+                        pass
+                    break
+
+    totals_map = {}
+    for i in range(end, len(lines)):
+        stripped = lines[i].strip()
+        if stripped in _TOTALS_LABELS and i + 1 < len(lines):
+            nxt = lines[i + 1].strip().lstrip("$")
+            try:
+                totals_map[stripped] = float(nxt)
+            except ValueError:
+                pass
+
+    return {
+        "items": items,
+        "subtotal": totals_map.get("Items Subtotal", 0.0),
+        "tax": totals_map.get("Sales Tax", 0.0),
+        "service_fee": totals_map.get("Service Fee", 0.0),
+    }
 
 
 def _parse_item_notes(body: str) -> Optional[str]:
@@ -132,4 +177,5 @@ def parse_instacart_email(message: dict) -> Optional[dict]:
         "card_last4": card_match.group(1) if card_match else None,
         "instacart_order_id": order_id_match.group(1) if order_id_match else None,
         "notes": _parse_item_notes(body),
+        "structured_items": _parse_structured_items(body),
     }

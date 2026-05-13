@@ -1,7 +1,10 @@
-# Secrets
+# Secrets / sensitive data
 .env
+env.json
 token.json
 credentials.json
+dump_expenses_output.txt
+profiles/
 
 # Terraform
 .terraform/

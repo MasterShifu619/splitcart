@@ -21,12 +21,29 @@ def _build_client() -> Splitwise:
     )
 
 
-def create_grocery_expense(total: float, store: str, order_date: str, payer_id: int, instacart_order_id: str = None, notes: str = None) -> str:
-    """Create equal-split expense. Returns Splitwise expense ID."""
+def create_grocery_expense(
+    total: float,
+    store: str,
+    order_date: str,
+    payer_id: int,
+    instacart_order_id: str = None,
+    notes: str = None,
+    owed_shares: dict = None,
+) -> str:
+    """Create expense. owed_shares: {user_id: amount}. Falls back to equal split if None."""
     client = _build_client()
-    n = len(SPLITWISE_USER_IDS)
-    share = round(total / n, 2)
-    remainder = round(total - share * n, 2)
+
+    if owed_shares:
+        active_ids = list(owed_shares.keys())
+    else:
+        active_ids = SPLITWISE_USER_IDS
+        n = len(active_ids)
+        share = round(total / n, 2)
+        remainder = round(total - share * n, 2)
+        owed_shares = {
+            uid: share + (remainder if i == 0 else 0.0)
+            for i, uid in enumerate(active_ids)
+        }
 
     expense = Expense()
     expense.cost = str(total)
@@ -39,13 +56,10 @@ def create_grocery_expense(total: float, store: str, order_date: str, payer_id: 
     expense.split_equally = False
 
     users = []
-    for i, uid in enumerate(SPLITWISE_USER_IDS):
+    for uid, owed in owed_shares.items():
         u = ExpenseUser()
         u.id = uid
-        is_payer = uid == payer_id
-        paid = total if is_payer else 0.0
-        owed = share + (remainder if i == 0 else 0.0)
-        u.paid_share = str(round(paid, 2))
+        u.paid_share = str(round(total if uid == payer_id else 0.0, 2))
         u.owed_share = str(round(owed, 2))
         users.append(u)
 

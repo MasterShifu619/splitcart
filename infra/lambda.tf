@@ -9,6 +9,7 @@ resource "null_resource" "install_deps" {
       cp ${path.module}/../*.py ${path.module}/build/
       [ -f ${path.module}/../credentials.json ] && cp ${path.module}/../credentials.json ${path.module}/build/ || true
       [ -f ${path.module}/../token.json ] && cp ${path.module}/../token.json ${path.module}/build/ || true
+      mkdir -p ${path.module}/build/profiles && cp ${path.module}/../profiles/*.json ${path.module}/build/profiles/
     EOT
   }
 }
@@ -45,6 +46,19 @@ resource "aws_iam_role_policy" "splitcart_dynamo" {
   })
 }
 
+resource "aws_iam_role_policy" "splitcart_bedrock" {
+  name = "splitcart-bedrock"
+  role = aws_iam_role.splitcart_lambda.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["bedrock:InvokeModel"]
+      Resource = "arn:aws:bedrock:us-east-1::foundation-model/amazon.nova-lite-v1:0"
+    }]
+  })
+}
+
 resource "aws_iam_role_policy_attachment" "basic_execution" {
   role       = aws_iam_role.splitcart_lambda.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
@@ -72,6 +86,10 @@ resource "aws_lambda_function" "splitcart" {
       GMAIL_CREDENTIALS_JSON = "/var/task/credentials.json"
       GMAIL_TOKEN_JSON       = "/tmp/token.json"
       DYNAMODB_TABLE         = aws_dynamodb_table.processed_orders.name
+      VOYAGE_API_KEY         = var.voyage_api_key
+      PINECONE_API_KEY       = var.pinecone_api_key
+      PINECONE_INDEX         = var.pinecone_index
+      AWS_REGION_NAME        = var.aws_region
     }
   }
 
