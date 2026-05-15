@@ -9,7 +9,12 @@
       "Bash(docker login *)",
       "Bash(docker buildx build *)",
       "Bash(aws lambda update-function-code *)",
-      "Bash(aws lambda *)"
+      "Bash(aws lambda *)",
+      "Bash(aws logs *)",
+      "Bash(\"/mnt/c/Program Files/Docker/Docker/resources/bin/docker.exe\" login --username AWS --password-stdin 971551576294.dkr.ecr.us-east-1.amazonaws.com)",
+      "Bash(\"/mnt/c/Program Files/Docker/Docker/resources/bin/docker.exe\" buildx build --platform linux/amd64 --provenance=false -t 971551576294.dkr.ecr.us-east-1.amazonaws.com/splitcart:latest --push .)",
+      "Bash(aws dynamodb get-item *)",
+      "Bash(aws dynamodb *)"
     ]
   }
 }

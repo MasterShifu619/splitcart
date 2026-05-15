@@ -91,9 +91,15 @@ def _parse_structured_items(body: str) -> Optional[dict]:
             except ValueError:
                 pass
 
+    stated_subtotal = totals_map.get("Items Subtotal", 0.0)
+    parsed_sum = round(sum(it["price"] for it in items), 2)
+    gap = round(stated_subtotal - parsed_sum, 2)
+    if gap > 0.01:
+        items.append({"name": "Order adjustments", "price": gap})
+
     return {
         "items": items,
-        "subtotal": totals_map.get("Items Subtotal", 0.0),
+        "subtotal": stated_subtotal,
         "tax": totals_map.get("Sales Tax", 0.0),
         "service_fee": totals_map.get("Service Fee", 0.0),
     }

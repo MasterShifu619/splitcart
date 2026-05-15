@@ -14,9 +14,18 @@ USER_NAMES = {
     68880174: "Deepanshu",
 }
 
-voyage = voyageai.Client(api_key=os.environ["VOYAGE_API_KEY"])
-pc = Pinecone(api_key=os.environ["PINECONE_API_KEY"])
-bedrock = boto3.client("bedrock-runtime", region_name=os.environ.get("AWS_REGION_NAME", "us-east-1"))
+_voyage = None
+_pc = None
+_bedrock = None
+
+
+def _clients():
+    global _voyage, _pc, _bedrock
+    if _voyage is None:
+        _voyage = voyageai.Client(api_key=os.environ["VOYAGE_API_KEY"])
+        _pc = Pinecone(api_key=os.environ["PINECONE_API_KEY"])
+        _bedrock = boto3.client("bedrock-runtime", region_name=os.environ.get("AWS_REGION_NAME", "us-east-1"))
+    return _voyage, _pc, _bedrock
 
 PROFILES_DIR = os.path.join(os.path.dirname(__file__), "profiles")
 
@@ -42,12 +51,9 @@ def _profile_match(item: str, profiles: list[dict], active_user_ids: list[int]) 
     return None
 
 
-def _get_index():
-    return pc.Index(os.environ["PINECONE_INDEX"])
-
-
 def _retrieve(query: str, namespace: str, top_k: int = 5) -> list[str]:
-    index = _get_index()
+    voyage, pc, _ = _clients()
+    index = pc.Index(os.environ["PINECONE_INDEX"])
     result = voyage.embed([query], model="voyage-3", input_type="query")
     vector = result.embeddings[0]
     response = index.query(
@@ -126,6 +132,7 @@ def classify_items(items: list[str], active_user_ids: list[int]) -> list[dict]:
 
     prompt = _build_prompt(ambiguous_items, active_user_ids, profile_chunks[:10], history_chunks[:10])
 
+    _, _, bedrock = _clients()
     response = bedrock.converse(
         modelId="amazon.nova-lite-v1:0",
         messages=[{"role": "user", "content": [{"text": prompt}]}],

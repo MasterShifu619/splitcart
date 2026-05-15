@@ -10,7 +10,7 @@ import email_parser
 import splitwise_client
 import item_splitter
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, force=True)
 logger = logging.getLogger(__name__)
 
 ALLOWED_STORES = ["Costco", "Food Lion"]
