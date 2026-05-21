@@ -21,7 +21,11 @@ Gmail API → parse email (store, total, card)
       ↓
 DynamoDB (dedup check) → Splitwise API (create expense)
 ```
+### Version 2
+
 <img width="1061" height="864" alt="image" src="https://github.com/user-attachments/assets/9a9ddb60-9bbe-4c3b-957b-2f726cbdece0" />
+
+### Version 1
 
 <img width="720" height="560" alt="image" src="https://github.com/user-attachments/assets/b2b239ed-4531-42fc-943f-604eaf6c5a7a" />
 
